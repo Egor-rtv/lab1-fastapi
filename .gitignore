@@ -1,0 +1,20 @@
+# Виртуальное окружение
+venv/
+.env/
+
+# Кэш Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Редакторы
+.vscode/
+.idea/
+
+# Docker-образ (если сохранял на флешку)
+*.tar
+
+# Системные файлы
+.DS_Store
+Thumbs.db
