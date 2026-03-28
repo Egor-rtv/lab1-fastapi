@@ -1,46 +1,102 @@
-# Лабораторная работа 1: Клиент-серверное взаимодействие
+Лабораторная работа №2: RESTful API + PostgreSQL + Soft Delete
+Описание
 
-## Описание
-Веб-приложение на FastAPI, которое возвращает количество дней до Нового года.
+REST API для управления предметами (items) с использованием FastAPI, PostgreSQL, SQLAlchemy, Alembic.
+Технологии
 
-## Технологии
-- Python 3.11
-- FastAPI
-- Docker
+    Python 3.11 / FastAPI
 
-## Структура проекта
-lab1-fastapi/
+    PostgreSQL 16
+
+    SQLAlchemy (async)
+
+    Alembic (миграции)
+
+    Docker Compose
+
+Функциональность
+
+     CRUD (GET, POST, PUT, PATCH, DELETE)
+
+    Пагинация (page, limit)
+
+     Мягкое удаление (soft delete)
+
+     Валидация через Pydantic
+
+     Миграции Alembic
+
+Запуск
+
+    Клонировать репозиторий:
+    bash
+
+    git clone https://github.com/Egor-rtv/lab1-fastapi.git
+    cd lab1-fastapi
+
+    Создать .env из примера:
+    bash
+
+    cp .env.example .env
+
+    Запустить через Docker Compose:
+    bash
+
+    docker-compose up --build
+
+    Открыть Swagger:
+    text
+
+    http://localhost:4200/docs
+
+API Endpoints
+Метод	URL	Описание
+GET	/items	Список с пагинацией
+POST	/items	Создать элемент
+GET	/items/{id}	Получить по ID
+PUT	/items/{id}	Полное обновление
+PATCH	/items/{id}	Частичное обновление
+DELETE	/items/{id}	Мягкое удаление
+Пагинация
+
+    page — страница (по умолч. 1)
+
+    limit — элементов на странице (по умолч. 10, макс. 100)
+
+Примеры запросов
+
+Создать элемент:
+bash
+
+curl -X POST http://localhost:4200/items \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Ноутбук", "description": "Игровой ноутбук"}'
+
+Получить список:
+bash
+
+curl "http://localhost:4200/items?page=1&limit=10"
+
+Мягкое удаление:
+bash
+
+curl -X DELETE http://localhost:4200/items/1
+
+Структура проекта
+text
+
+labi/
+├── app/
+│   ├── routers/
+│   │   └── items.py
+│   ├── crud.py
+│   ├── database.py
+│   ├── models.py
+│   ├── schemas.py
+│   └── main2.py
+├── migrations/
+├── alembic.ini
+├── docker-compose.yml
 ├── Dockerfile
-├── .dockerignore
-├── .gitignore
 ├── requirements.txt
-├── README.md
-└── main.py
-## Запуск приложения
-
-### 1. Клонирование репозитория
-```bash
-git clone https://github.com/Egor-rtv/lab1-fastapi.git
-cd lab1-fastapi
-2. Запуск через Docker
-```
-Собрать образ:
-bash
-
-docker build -t lab1-fastapi .
-
-Запустить контейнер:
-bash
-
-docker run -p 4200:4200 lab1-fastapi
-
-3. Проверка работы
-
-Открыть в браузере: http://localhost:4200/info
-
-Ожидаемый ответ:
-json
-
-{
-    "days_before_new_year": 123
-}
+└── README.md
