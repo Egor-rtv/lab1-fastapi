@@ -1,15 +1,26 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from pydantic_settings import BaseSettings
-import os
 
 # Настройки из переменных окружения
 class Settings(BaseSettings):
+    # PostgreSQL
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_USER: str = "student"
     DB_PASSWORD: str = "student_secure_password"
     DB_NAME: str = "lab_db"
+    
+    # JWT
+    jwt_access_secret: str
+    jwt_refresh_secret: str
+    jwt_access_expiration: int = 15
+    jwt_refresh_expiration: int = 10080
+    
+    # OAuth Yandex
+    yandex_client_id: str
+    yandex_client_secret: str
+    yandex_redirect_uri: str
     
     @property
     def DATABASE_URL(self):
@@ -17,10 +28,13 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
+
+# Создаём экземпляр настроек
 settings = Settings()
 
-# Создаём движок для асинхронной работы с БД
+# Создаём асинхронный движок для работы с БД
 engine = create_async_engine(settings.DATABASE_URL, echo=True)
 
 # Фабрика сессий

@@ -40,3 +40,36 @@ class PaginationParams(BaseModel):
 class PaginatedResponse(BaseModel):
     data: list[ItemResponse]
     meta: dict
+# ==================== AUTH SCHEMAS ====================
+
+class UserRegister(BaseModel):
+    """Схема для регистрации нового пользователя"""
+    email: str = Field(..., min_length=5, max_length=255)
+    password: str = Field(..., min_length=6, max_length=100)
+
+
+class UserLogin(BaseModel):
+    """Схема для входа пользователя"""
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """Схема ответа с данными пользователя (без пароля)"""
+    id: int
+    email: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class WhoamiResponse(BaseModel):
+    """Схема ответа для эндпоинта /whoami"""
+    user: UserResponse
+
+
+class AuthResponse(BaseModel):
+    """Схема ответа при успешной аутентификации"""
+    message: str
+    user: UserResponse

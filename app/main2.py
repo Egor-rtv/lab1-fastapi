@@ -1,11 +1,12 @@
 from fastapi import FastAPI
-from app.routers import items
+from app.routers import items, auth
 from datetime import date
 
 app = FastAPI(title="Lab2 REST API", version="1.0")
 
 # Подключаем роутеры
 app.include_router(items.router)
+app.include_router(auth.router)  
 
 @app.get("/")
 async def root():
