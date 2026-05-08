@@ -1,4 +1,5 @@
 from fastapi import Response
+from datetime import datetime, timedelta
 
 
 def set_auth_cookies(
@@ -6,36 +7,34 @@ def set_auth_cookies(
     access_token: str,
     refresh_token: str
 ) -> None:
-    """
-    Устанавливает HttpOnly cookies с токенами.
-    Cookies нельзя прочитать из JavaScript (безопасно).
-    """
-    # Access Token cookie
+    # Access Token cookie (15 минут)
+    expires_access = datetime.utcnow() + timedelta(minutes=15)
+    
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,          # JS не может прочитать
-        samesite="lax",         # Защита от CSRF
-        secure=False,           # True для HTTPS, False для локальной разработки
-        max_age=15 * 60,        # 15 минут в секундах
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        expires=expires_access.strftime("%a, %d %b %Y %H:%M:%S GMT"),
         path="/"
     )
     
-    # Refresh Token cookie
+    # Refresh Token cookie (7 дней)
+    expires_refresh = datetime.utcnow() + timedelta(days=7)
+    
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
         samesite="lax",
         secure=False,
-        max_age=7 * 24 * 60 * 60,  # 7 дней в секундах
+        expires=expires_refresh.strftime("%a, %d %b %Y %H:%M:%S GMT"),
         path="/"
     )
 
 
 def clear_auth_cookies(response: Response) -> None:
-    """
-    Удаляет cookies с токенами (при выходе из системы).
-    """
+    """Удаляет cookies с токенами (при выходе из системы)."""
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/")

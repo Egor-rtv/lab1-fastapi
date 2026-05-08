@@ -177,6 +177,8 @@ async def whoami(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
+    print(">>> WHOAMI ENDPOINT CALLED <<<")
+    print(f"Cookies: {request.cookies}")
     """
     Получение информации о текущем пользователе.
     """
@@ -303,69 +305,93 @@ async def oauth_yandex_callback(
     """
     Обработка callback'а от Яндекса после успешной авторизации.
     """
+    # ДИАГНОСТИКА: проверяем, что мы вообще попали сюда
+    print("=" * 50)
+    print("CALLBACK WAS CALLED!")
+    print(f"Received code: {code}")
+    print(f"Received state: {state}")
+    print(f"Cookies in request: {request.cookies}")
+    print("=" * 50)
+    
     # 1. Проверяем state (защита от CSRF)
     saved_state = request.cookies.get("oauth_state")
+    print(f"Saved state from cookie: {saved_state}")
+    
     if not saved_state or saved_state != state:
+        print("STATE MISMATCH! CSRF detected")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid state parameter"
         )
+    print("State OK")
     
     # 2. Проверяем, что code есть
     if not code:
+        print("No code parameter")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Authorization code not provided"
         )
+    print(f"Code OK: {code[:20]}...")
     
     # 3. Обмениваем code на Access Token
+    print("Exchanging code for token...")
     token_data = await exchange_code_for_token(code)
     if not token_data or "access_token" not in token_data:
+        print(f"Token exchange failed: {token_data}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to exchange code for token"
         )
+    print("Token exchange OK")
     
     access_token_yandex = token_data["access_token"]
     
     # 4. Получаем информацию о пользователе
+    print("Getting user info from Yandex...")
     user_info = await get_yandex_user_info(access_token_yandex)
     if not user_info:
+        print("Failed to get user info")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to get user info from Yandex"
         )
+    print(f"User info: {user_info}")
     
     # 5. Извлекаем email и yandex_id
     email = user_info.get("default_email") or user_info.get("email")
     yandex_id = user_info.get("id")
     
     if not email or not yandex_id:
+        print(f"Missing email or yandex_id: email={email}, yandex_id={yandex_id}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User email or ID not provided by Yandex"
         )
+    print(f"Email: {email}, Yandex ID: {yandex_id}")
     
     # 6. Ищем или создаём пользователя в БД
     user_service = UserService(db)
     user = await user_service.get_user_by_yandex_id(yandex_id)
+    print(f"User found by yandex_id: {user}")
     
     if not user:
-        # Пробуем найти по email
         user = await user_service.get_user_by_email(email)
+        print(f"User found by email: {user}")
         
         if user:
-            # Обновляем существующего пользователя: добавляем yandex_id
             user.yandex_id = yandex_id
             await db.commit()
             await db.refresh(user)
+            print("Updated existing user with yandex_id")
         else:
-            # Создаём нового пользователя
             user = await user_service.create_user_yandex(email, yandex_id)
+            print("Created new user")
     
     # 7. Генерируем локальные JWT токены
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
+    print(f"Generated tokens for user {user.id}")
     
     # 8. Хешируем Refresh Token и сохраняем в БД
     refresh_token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
@@ -373,12 +399,18 @@ async def oauth_yandex_callback(
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_refresh_expiration)
     await refresh_service.create_token(user.id, refresh_token_hash, expires_at)
     
-    # 9. Устанавливаем cookies
+          # 9. Устанавливаем cookies через response
     set_auth_cookies(response, access_token, refresh_token)
     
     # 10. Удаляем временный state cookie
     response.delete_cookie("oauth_state")
     
-    # 11. Редиректим на фронтенд (или возвращаем успех)
+    # 11. Редиректим на фронтенд с cookies
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="http://localhost:4200/docs")
+    redirect_response = RedirectResponse(url="http://localhost:4200/docs", status_code=302)
+    
+    # Копируем все Set-Cookie заголовки в редирект
+    for cookie_header in response.headers.getlist("Set-Cookie"):
+        redirect_response.headers.append("Set-Cookie", cookie_header)
+    
+    return redirect_response
