@@ -1,75 +1,155 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-# Базовая схема для ответа
+
+# ==================== ITEM SCHEMAS ====================
+
 class ItemBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = None
-    status: str = "active"
+    """Базовая схема предмета"""
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Название предмета (обязательное поле)",
+        example="Ноутбук"
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Описание предмета (опциональное)",
+        example="Мощный игровой ноутбук с RTX 4060"
+    )
+    status: str = Field(
+        "active",
+        description="Статус предмета",
+        example="active",
+        pattern="^(active|inactive)$"
+    )
 
-# Схема для создания (POST)
+
 class ItemCreate(ItemBase):
+    """Схема для создания предмета (POST /items)"""
     pass
 
-# Схема для обновления (PUT/PATCH) — все поля опциональны
-class ItemUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = None
-    status: Optional[str] = None
 
-# Схема для ответа (возвращаем клиенту)
+class ItemUpdate(BaseModel):
+    """Схема для обновления предмета (PUT / PATCH)"""
+    name: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=100,
+        description="Название предмета",
+        example="Игровой ноутбук"
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Описание предмета",
+        example="RTX 4060, 32GB RAM"
+    )
+    status: Optional[str] = Field(
+        None,
+        description="Статус предмета",
+        example="inactive"
+    )
+
+
 class ItemResponse(ItemBase):
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    """Схема ответа с данными предмета"""
+    id: int = Field(..., description="Уникальный идентификатор", example=1)
+    created_at: datetime = Field(..., description="Дата создания")
+    updated_at: Optional[datetime] = Field(None, description="Дата последнего обновления")
     
     class Config:
         from_attributes = True
 
-# Схема для пагинации
-class PaginationParams(BaseModel):
-    page: int = Field(1, ge=1)
-    limit: int = Field(10, ge=1, le=100)
-    
-    @property
-    def offset(self):
-        return (self.page - 1) * self.limit
 
-# Схема для ответа с пагинацией
-class PaginatedResponse(BaseModel):
-    data: list[ItemResponse]
-    meta: dict
 # ==================== AUTH SCHEMAS ====================
 
 class UserRegister(BaseModel):
-    """Схема для регистрации нового пользователя"""
-    email: str = Field(..., min_length=5, max_length=255)
-    password: str = Field(..., min_length=6, max_length=100)
+    """Схема для регистрации пользователя"""
+    email: str = Field(
+        ...,
+        description="Email пользователя",
+        example="user@example.com"
+    )
+    password: str = Field(
+        ...,
+        min_length=6,
+        max_length=100,
+        description="Пароль (минимум 6 символов)",
+        example="strongpassword123"
+    )
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        """Простая проверка email"""
+        if "@" not in v or "." not in v:
+            raise ValueError("Invalid email format")
+        return v
 
 
 class UserLogin(BaseModel):
     """Схема для входа пользователя"""
-    email: str
-    password: str
+    email: str = Field(..., description="Email пользователя", example="user@example.com")
+    password: str = Field(..., description="Пароль", example="strongpassword123")
 
 
 class UserResponse(BaseModel):
-    """Схема ответа с данными пользователя (без пароля)"""
-    id: int
-    email: str
-    created_at: datetime
+    """Схема ответа с данными пользователя (без пароля и токенов)"""
+    id: int = Field(..., description="Уникальный идентификатор", example=1)
+    email: str = Field(..., description="Email пользователя", example="user@example.com")
+    created_at: datetime = Field(..., description="Дата регистрации")
     
     class Config:
         from_attributes = True
 
 
-class WhoamiResponse(BaseModel):
-    """Схема ответа для эндпоинта /whoami"""
-    user: UserResponse
-
-
 class AuthResponse(BaseModel):
     """Схема ответа при успешной аутентификации"""
-    message: str
-    user: UserResponse
+    message: str = Field(..., description="Сообщение о результате", example="Login successful")
+    user: UserResponse = Field(..., description="Данные пользователя")
+
+
+class WhoamiResponse(BaseModel):
+    """Схема ответа для эндпоинта /whoami"""
+    user: UserResponse = Field(..., description="Данные текущего пользователя")
+
+
+# ==================== PAGINATION SCHEMAS ====================
+
+class PaginationParams(BaseModel):
+    """Параметры пагинации для GET /items"""
+    page: int = Field(
+        1,
+        ge=1,
+        description="Номер страницы (начинается с 1)",
+        example=2
+    )
+    limit: int = Field(
+        10,
+        ge=1,
+        le=100,
+        description="Количество элементов на странице (от 1 до 100)",
+        example=20
+    )
+    
+    @property
+    def offset(self) -> int:
+        """Смещение для SQL запроса"""
+        return (self.page - 1) * self.limit
+
+
+class PaginatedResponse(BaseModel):
+    """Схема ответа с пагинированным списком предметов"""
+    data: List[ItemResponse] = Field(..., description="Массив предметов")
+    meta: Dict[str, Any] = Field(
+        ...,
+        description="Мета-информация о пагинации",
+        example={
+            "total": 25,
+            "page": 2,
+            "limit": 10,
+            "totalPages": 3
+        }
+    )

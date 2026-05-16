@@ -2,47 +2,52 @@ from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.security.jwt import get_user_id_from_access_token
+from app.security.jwt import get_user_id_from_access_token, get_jti_from_access_token
 from app.crud import UserService
+from app.services.cache_service import get_cache_service, CacheService
 
 
 async def get_current_user(
     request: Request,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    cache: CacheService = Depends(get_cache_service)
 ):
     """
     Dependency для получения текущего авторизованного пользователя.
+    Проверяет Access Token и наличие JTI в Redis.
     """
-    print("=" * 50)
-    print("get_current_user CALLED")
-    print(f"All cookies in request: {request.cookies}")
-    
     # Извлекаем токен из cookies
     access_token = request.cookies.get("access_token")
-    print(f"Access token from cookie: {access_token[:20] if access_token else 'None'}")
     
     if not access_token:
-        print("No access token in cookies")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
     
-    # Декодируем токен и получаем user_id
+    # Декодируем токен и получаем user_id и jti
     user_id = get_user_id_from_access_token(access_token)
-    print(f"User_id from token: {user_id}")
+    jti = get_jti_from_access_token(access_token)
     
-    if not user_id:
-        print("Invalid or expired token")
+    if not user_id or not jti:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
     
+    # Проверяем, что jti есть в Redis (токен не отозван)
+    redis_key = f"wp:auth:user:{user_id}:access:{jti}"
+    is_valid = await cache.get(redis_key)
+    
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token revoked"
+        )
+    
     # Загружаем пользователя из БД
     user_service = UserService(db)
     user = await user_service.get_user_by_id(user_id)
-    print(f"User from DB: {user.email if user else 'None'}")
     
     if not user:
         raise HTTPException(
@@ -50,6 +55,4 @@ async def get_current_user(
             detail="User not found"
         )
     
-    print("get_current_user SUCCESS")
-    print("=" * 50)
     return user

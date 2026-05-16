@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     DB_USER: str = "student"
     DB_PASSWORD: str = "student_secure_password"
     DB_NAME: str = "lab_db"
+
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
+    CACHE_TTL_DEFAULT: int = 300
     
     # JWT
     jwt_access_secret: str

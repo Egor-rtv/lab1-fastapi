@@ -1,12 +1,34 @@
+import os
 from fastapi import FastAPI
 from app.routers import items, auth
 from datetime import date
 
-app = FastAPI(title="Lab2 REST API", version="1.0")
+# Получаем режим работы
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# Условное создание приложения
+if ENVIRONMENT == "production":
+    app = FastAPI(
+        title="Lab Project API",
+        description="...",
+        version="1.0.0",
+        docs_url=None,      # отключаем Swagger
+        redoc_url=None,     # отключаем ReDoc
+        openapi_url=None    # отключаем OpenAPI JSON
+    )
+else:
+    app = FastAPI(
+        title="Lab Project API",
+        description="...",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json"
+    )
 
 # Подключаем роутеры
 app.include_router(items.router)
-app.include_router(auth.router)  
+app.include_router(auth.router)
 
 @app.get("/")
 async def root():

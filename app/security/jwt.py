@@ -1,42 +1,49 @@
 import jwt
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from app.database import settings
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int) -> Tuple[str, str]:
     """
     Создаёт Access Token (короткоживущий).
-    Время жизни берётся из .env (по умолчанию 15 минут).
+    Возвращает (token, jti)
     """
+    jti = str(uuid.uuid4())
     expires_delta = timedelta(minutes=settings.jwt_access_expiration)
     expire = datetime.now(timezone.utc) + expires_delta
     
     payload = {
         "sub": str(user_id),
         "exp": expire,
-        "type": "access"
+        "type": "access",
+        "jti": jti
     }
     
-    return jwt.encode(payload, settings.jwt_access_secret, algorithm="HS256")
+    token = jwt.encode(payload, settings.jwt_access_secret, algorithm="HS256")
+    return token, jti
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: int) -> Tuple[str, str]:
     """
     Создаёт Refresh Token (долгоживущий).
-    Время жизни берётся из .env (по умолчанию 7 дней).
+    Возвращает (token, jti)
     """
+    jti = str(uuid.uuid4())
     expires_delta = timedelta(minutes=settings.jwt_refresh_expiration)
     expire = datetime.now(timezone.utc) + expires_delta
     
     payload = {
         "sub": str(user_id),
         "exp": expire,
-        "type": "refresh"
+        "type": "refresh",
+        "jti": jti
     }
     
-    return jwt.encode(payload, settings.jwt_refresh_secret, algorithm="HS256")
+    token = jwt.encode(payload, settings.jwt_refresh_secret, algorithm="HS256")
+    return token, jti
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
@@ -84,4 +91,12 @@ def get_user_id_from_access_token(token: str) -> Optional[int]:
     payload = decode_access_token(token)
     if payload and "sub" in payload:
         return int(payload["sub"])
+    return None
+
+
+def get_jti_from_access_token(token: str) -> Optional[str]:
+    """Извлекает jti из Access Token"""
+    payload = decode_access_token(token)
+    if payload and "jti" in payload:
+        return payload["jti"]
     return None
